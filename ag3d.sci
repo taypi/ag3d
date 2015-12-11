@@ -4,10 +4,23 @@ function z = funcao(x, y)
 endfunction
 
 //--------------------------------------------------------
-function grafico()
-    x = intNeg:0.1:intPos;
-    y =  funcao(x);
-    plot(x,y);
+function grafico()    
+    [x,y] = meshgrid(minvalx:0.1:maxvalx,minvaly:0.1:maxvaly);
+    
+    z = funcao(x,y)
+    
+    //printf("max: %f", max(z));
+    
+    surf(x,y,z)
+endfunction
+
+//--------------------------------------------------------
+function [maxZ, minZ] = support()
+    [x,y] = meshgrid(minvalx:0.1:maxvalx,minvaly:0.1:maxvaly);  
+    z = funcao(x,y)
+    
+    maxZ = max(z);
+    minZ = min(z);
 endfunction
 
 //--------------------------------------------------------
@@ -40,17 +53,23 @@ function dec = binarioToDecimal(binario)
 endfunction
 
 //--------------------------------------------------------
-function x = normalizar(decimal)
+function x = normalizar(decimal, maxval, minval)
     interval = maxval-minval;
     x = minval + interval * decimal / (2^(nGens)-1);
-    
-endfunction  
+endfunction
+
 //--------------------------------------------------------
 function val = aptidao(decX, decY)
-    normalizadoX = normalizar(decX);
-    normalizadoY = normalizar(decY);
+    normalizadoX = normalizar(decX, maxvalx, minvalx);
+    normalizadoY = normalizar(decY, maxvaly, minvaly);
+    //printf("x: %f, y: %f\n", normalizadoX, normalizadoY)
     val = funcao(normalizadoX, normalizadoY);
-    val = 50 * (val + 1);
+    if val > maxZ then
+        maxZ = val;
+    end
+    //printf("val: %f\n", val)
+    //disp(val);
+    val = 100 * (val - minZ)/(maxZ - minZ);
 endfunction
 
 //--------------------------------------------------------
@@ -85,6 +104,7 @@ function [respostaX, respostaY] = roleta(popX, popY)
             end
             acumulado = acumulado + taxa;
         end
+        //disp(indiceMarido, indiceEsposa);
         respostaX = [respostaX; popX(indiceMarido, :)];
         respostaX = [respostaX; popX(indiceEsposa, :)];
         respostaY = [respostaY; popY(indiceMarido, :)];
@@ -103,12 +123,9 @@ function [filhosX, filhosY] = crossover(pai1X, pai2X, pai1Y, pai2Y)
             pai1X(i) = pai2X(i);
             pai2X(i)= aux;
         end
-    end
     
-    posicaoAux = rand() * nGens;
-    posicao = ceil(posicaoAux);
-    r = rand();
-    if(r < porcentagemCross) then
+        posicaoAux = rand() * nGens;
+        posicao = ceil(posicaoAux);
         for(i=posicao:1:nGens)
             aux = pai1Y(i);
             pai1Y(i) = pai2Y(i);
@@ -124,7 +141,7 @@ function xman = mutacao(pessoa)
     for (i=1:1:nGens)
         if (rand(1) < porcentagemMutacao) then
             if (pessoa(i) == 1) then
-                 pessoa(i) =0;
+                pessoa(i) = 0;
             else 
                 pessoa(i) = 1;
             end
@@ -177,39 +194,51 @@ function [newPopulacaoX, newPopulacaoY] = formarNovaGeracao(casaisX, casaisY)
 endfunction
 
 //------------------------------------------------------
-function [popX, popY] = final()
-    [popX, popY] = gerarPopulacao();
-    for (i=1:geracoes)
-         [casaisX, casaisY] = roleta(popX, popY);
-         [popX, popY] = formarNovaGeracao(casaisX, casaisY);
-         //disp(populacao)
-    end
-endfunction
-
-//------------------------------------------------------
-function val = mediaAdaptacao(popX, popY)
+function [val, vetorApt] = mediaAdaptacao(popX, popY)
     val = 0;
     for (i = 1:1:nIndividuos)
         dx = binarioToDecimal(popX(i,:));
         dy= binarioToDecimal(popY(i,:));
         val = val + aptidao(dx, dy);
+        vetorApt(i) = aptidao(dx, dy);
     end
     val = val/nIndividuos;
-    printf('media aptidao = %f \n', val);
+    //printf('media aptidao = %f \n', val);
 endfunction
 
-geracoes = 50;
-porcentagemMutacao = 0.05;
+function [z, x, y, val] = maxApt(popX, popY)
+    [val, vetorApt] = mediaAdaptacao(popX, popY);
+    [maxValue, ind] = max(vetorApt);
+    x = normalizar(binarioToDecimal(popX(ind,:)), maxvalx, minvalx);
+    y = normalizar(binarioToDecimal(popY(ind,:)), maxvaly, minvaly);
+    z = funcao(x,y);
+    printf("z = %f, x = %f, y = %f \n, media = %f \n", z, x, y, val);
+endfunction
+
+//------------------------------------------------------
+function [z, x, y, val] = final()
+    [popX, popY] = gerarPopulacao();
+    for (i=1:geracoes)
+         [casaisX, casaisY] = roleta(popX, popY);
+         [popX, popY] = formarNovaGeracao(casaisX, casaisY);
+         //mediaAdaptacao(popX, popY)
+         //disp(populacao)
+    end
+    [z, x, y, val] = maxApt(popX, popY);
+endfunction
+
+geracoes = 30;
+porcentagemMutacao = 0.01;
 porcentagemCross = 0.8;
-maxval = 10;
-minval = 0;
-intNeg = minval;
-intPos = maxval;
+maxvalx = 1;
+minvalx = -1;
+maxvaly = 1;
+minvaly = -1;
 porcentagemGenetica = 0.5;
-nGens = 13;
-nIndividuos = 5;
+nGens = 30;
+nIndividuos = 30;
+[maxZ, minZ] = support();
 
 //grafico();
-[popX, popY] = final();
-//disp (pop)
-val = mediaAdaptacao(popX, popY);
+[z, x, y, val] = final();
+//disp (popY)
